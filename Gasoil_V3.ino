@@ -1,13 +1,10 @@
-//---------------------------------------------------
-// 0. Información
-//---------------------------------------------------
-
-// Control del consumo de Gasoil
-// Wemos D1 + Sensor de corriente efecto Hall + Servo indicador de litros + Relé SSR avisador de reserva + Thingspeak + OTA
-
-//---------------------------------------------------
-// 1. Librerias
-//---------------------------------------------------
+/**
+ *@file Gasoil_V3.ino
+ *@brief Control del consumo de Gasoil
+ *
+ *@authorDr.Zhao Zhang
+ *@note: Se ha utilizado la siguiente configuración hardware para su uso: Wemos D1 + Sensor de corriente efecto Hall + Servo indicador de litros + Relé SSR avisador de reserva + Thingspeak + OTA
+ */
 
 #include <ESP8266WiFi.h>
 #include <Timer.h>
@@ -40,7 +37,10 @@ const char* server = "api.thingspeak.com";
 
 bool monitorserie = true;                            // Poner true para hacer debug por monitor serie o false para desactivarlo
 int litros_medidos = 2975;                          // Actualizar cantidad de gasoil cuando se rellene el depósito
-const float l_seg = 0.078;                            // Poner el dato de litros / segundo que impulsa la bomba
+/**
+ * Parámetro de la bomba medido en litros por segundo
+ */
+const float l_seg = 0.078;
 
 const char* ssid = STASSID;           
 const char* password = STAPSK;            
