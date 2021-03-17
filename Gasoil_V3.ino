@@ -55,21 +55,9 @@ unsigned long tiempofin = 0;
 unsigned long tiempobomba = 0;
 unsigned long tiempoacumulado = 0;
 
-
-//----------------------------------------------------
-// 4. Objetos
-//----------------------------------------------------
-
 WiFiClient client;
 Timer tiempo;
 Servo myServo;
-
-
-
-//====================================================
-// SETUP
-//====================================================
-
 
 void setup()
 {
@@ -106,11 +94,8 @@ void setup()
 
 void loop()
 {
-
   ArduinoOTA.handle();
-  
   tiempo.update();
-  
   corriente = 0;
   
   for ( i = 0; i < 100; i++ )
@@ -118,28 +103,23 @@ void loop()
     corriente = analogRead( HALL ) + corriente;
   }
   
-  
   corriente = corriente / 100;
 
   if ( corriente < 1000 )
   {
     tiempoinicio = millis();
-
     while ( corriente < 1000 )
     {
       ESP.wdtFeed();
-  
       corriente = 0;
   
       for ( i = 0; i < 100; i++ )
       {
         corriente = analogRead( HALL ) + corriente;
       }
-    
-    
+
       corriente = corriente / 100;
-    
-    
+
       if ( monitorserie == true )
       {
         Serial.print( "A0 ACTIVADO = " );
@@ -147,19 +127,13 @@ void loop()
       }
     }
     
-    
     tiempofin = millis();
     tiempobomba = tiempofin - tiempoinicio;  
     tiempoacumulado = tiempoacumulado + tiempobomba;
   }
-  
-  
+
   litros_consumidos = ( tiempoacumulado * l_seg ) / 1000;
-  
   litros_restantes = litros_medidos - litros_consumidos;
-  
-  
-  
   angle = map( litros_restantes, 0, 4000, 170, -5 );
   myServo.write( angle );
 
@@ -196,13 +170,9 @@ void loop()
   }
 }
 
-
-
-
-//====================================================
-// Función conectar a la red WiFi
-//====================================================
-
+/**
+ * Rutina de conexión a la red WiFi
+ */
 void conectawifi()
 {
 
@@ -222,7 +192,6 @@ void conectawifi()
     Serial.print( "Conexion satisfactoria a " );
     Serial.println( ssid );
     Serial.println( " " );
-
   }
 }
 
@@ -231,15 +200,16 @@ void conectawifi()
 //====================================================
 // Función enviar datos a Thingspeak
 //====================================================
-
+/**
+ * Función relacionada con el envío de datos a Thingspeak
+ */
 void Thingspeak()
 {
   if ( WiFi.status() != WL_CONNECTED ) 
   {
     conectawifi();
   }
-  
-  
+
   if ( client.connect( server, 80 ) ) 
   {
     String postStr = apiKey;
@@ -253,15 +223,12 @@ void Thingspeak()
     postStr += "&field4=";                              // El dato del funcionamiento lo envía al campo 4 del canal de Thingspeak
     postStr += String( millis() );
     postStr += "\r\n\r\n";
-    
-    
-    
-    if (monitorserie == true)
+
+    if ( monitorserie == true )
     {
-      Serial.println("ENVIANDO DATOS A THINGSPEAK");
-    } 
-    
-    
+      Serial.println( "ENVIANDO DATOS A THINGSPEAK" );
+    }
+
     client.print( "POST /update HTTP/1.1\n" );
     client.print( "Host: api.thingspeak.com\n" );
     client.print( "Connection: close\n" );
@@ -271,9 +238,8 @@ void Thingspeak()
     client.print( postStr.length() );
     client.print( "\n\n" );
     client.print( postStr );
-    
   } 
-  delay(1000);
+  delay( 1000 );
   client.stop();
   
   }
