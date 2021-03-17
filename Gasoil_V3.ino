@@ -22,9 +22,9 @@
 // 2. Conexiones
 //----------------------------------------------------
 
-#define HALL A0
-#define SSR D4
-#define ServoPIN D9
+#define HALL A0      // ¿Qué es hall?
+#define SSR D4       // ¿Qué es ssr?
+#define ServoPIN D9  // ¿Qué es ServoPIN?
 
 //----------------------------------------------------
 // 3. Variables y Comandos
