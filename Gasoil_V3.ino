@@ -23,9 +23,8 @@
 #define SSR D4       // ¿Qué es ssr?
 #define ServoPIN D9  // ¿Qué es ServoPIN?
 
-//----------------------------------------------------
-// 3. Variables y Comandos
-//----------------------------------------------------
+#define START_ANGLE_VALUE 170
+
 
 #ifndef STASSID
 #define STASSID "SSID"                            // Poner el nombre de la red WiFi entre las comillas   
@@ -42,33 +41,87 @@ int litros_medidos = 2975;                          // Actualizar cantidad de ga
  */
 const float l_seg = 0.078;
 
-const char* ssid = STASSID;           
-const char* password = STAPSK;            
+const char* ssid = STASSID;
+const char* password = STAPSK;
 const char* host = "OTA-LEDS";
 int litros_restantes = litros_medidos;
 int litros_consumidos;
-int angle = 170;
-float corriente = 0.0;
+int angle = START_ANGLE_VALUE;
 unsigned long tiempoinicio = 0;
 unsigned long tiempofin = 0;
 unsigned long tiempobomba = 0;
 unsigned long tiempoacumulado = 0;
 
+/*! Esta clase es el visor del monitor serie. Según se necesite, mostrará por puerto serie o no */
+class SerialMonitorViewer
+{
+public:
+  /** Constructor por defecto. 
+   *  @note Va a asignar el puerto serie a 9600 baudios
+   */
+  SerialMonitorViewer()
+  {
+    if ( monitorserie == true )
+    {
+      Serial.begin( 9600 );
+      delay( 10 );
+    }
+  }
+  
+  /*!
+   Función que va a mostrar el estado de la sonda HALL
+   Precondición: corriente debe existir y no ser NULL
+   @param[in]  corriente  La corriente que tiene el sistema en ese punto
+   */
+  void mostrarEstadoSensorHall(float * corriente)
+  {
+    if ( monitorserie == true )
+    {
+      Serial.print( "A0 ACTIVADO = " );
+      Serial.println( corriente[0] );
+    }
+  }
+private:
+};
+
+class IndicadorGasoil
+{
+  void inicio(void)
+  {
+    myServo.attach( ServoPIN );
+    angle = START_ANGLE_VALUE;
+    myServo.write( angle );
+    delay( 500 );
+  }
+  void extraerValorSalida(void)
+  {
+    angle = map( litros_restantes, 0, 4000, START_ANGLE_VALUE, -5 );
+  }
+}
+
 WiFiClient client;
 Timer tiempo;
 Servo myServo;
+SerialMonitorViewer viewer;
+IndicadorGasoil indicadorgasoil;
+
+
+float medir_promedio_corriente(void)
+{
+  float corriente = 0.0f;
+  for ( int i = 0; i < 100; i++ )
+  {
+    corriente = analogRead( HALL ) + corriente;
+  }
+  corriente = corriente / 100.0f;
+  return corriente;
+}
 
 void setup()
 {
-  if ( monitorserie == true )
-  {
-    Serial.begin( 9600 );                             // Poner monitor serie a 9600 baudios
-    delay( 10 );    
-  }
-
   WiFi.mode( WIFI_STA );
   ArduinoOTA.setHostname( host );
-  
+
   ArduinoOTA.onError( []( ota_error_t error )
   {
     (void) error;
@@ -80,60 +133,48 @@ void setup()
   pinMode( SSR, OUTPUT );
   digitalWrite( SSR, LOW ); 
 
-  myServo.attach( ServoPIN );
-  myServo.write( angle );
-  delay( 500 );
+  indicadorgasoil.inicio();
 
   Thingspeak();
-
   tiempo.every( 60000, Thingspeak );
 }
 
 
-
-void loop()
+void calcularTiempoBajaCorriente(float * corriente, unsigned long* tacumulado, unsigned long * tbomba)
 {
-  ArduinoOTA.handle();
-  tiempo.update();
-  corriente = 0;
-  
-  for ( int i = 0; i < 100; i++ )
-  {
-    corriente = analogRead( HALL ) + corriente;
-  }
-  
-  corriente = corriente / 100;
-
-  if ( corriente < 1000 )
+  if ( corriente[0] < 1000.0 )
   {
     tiempoinicio = millis();
-    while ( corriente < 1000 )
+    while ( corriente[0] < 1000.0 )
     {
       ESP.wdtFeed();
-      corriente = 0;
-  
-      for ( int i = 0; i < 100; i++ )
-      {
-        corriente = analogRead( HALL ) + corriente;
-      }
-
-      corriente = corriente / 100;
-
-      if ( monitorserie == true )
-      {
-        Serial.print( "A0 ACTIVADO = " );
-        Serial.println( corriente );
-      }
+      corriente[0] = medir_promedio_corriente();
+      viewer.mostrarEstadoSensorHall( corriente );
     }
     
     tiempofin = millis();
-    tiempobomba = tiempofin - tiempoinicio;  
-    tiempoacumulado = tiempoacumulado + tiempobomba;
+    tbomba[0] = tiempofin - tiempoinicio;
+    tacumulado[0] += tbomba[0];
   }
+}
 
+void calcularConsumoLitros(void)
+{
   litros_consumidos = ( tiempoacumulado * l_seg ) / 1000;
   litros_restantes = litros_medidos - litros_consumidos;
-  angle = map( litros_restantes, 0, 4000, 170, -5 );
+}
+
+void loop()
+{
+  float corriente = 0.0f;
+  ArduinoOTA.handle();
+  tiempo.update();
+
+  corriente = medir_promedio_corriente();
+  calcularTiempoBajaCorriente( &corriente, &tiempoacumulado, &tiempobomba );
+
+  calcularConsumoLitros();
+  indicadorgasoil.extraerValorSalida();
   myServo.write( angle );
 
   if ( litros_restantes < 1000 )
@@ -204,41 +245,45 @@ void conectawifi()
  */
 void Thingspeak()
 {
-  if ( WiFi.status() != WL_CONNECTED ) 
+  if ( WiFi.status() != WL_CONNECTED )
   {
     conectawifi();
   }
 
-  if ( client.connect( server, 80 ) ) 
+  if ( client.connect( server, 80 ) )
   {
-    String postStr = apiKey;
-    
-    postStr += "&field1=";                              // El dato de litros restantes lo envía al campo 1 del canal de Thingspeak
-    postStr += String( litros_restantes );
-    postStr += "&field2=";                              // El dato de temperatura objetivo lo envía al campo 2 del canal de Thingspeak
-    postStr += String( tiempoacumulado );
-    postStr += "&field3=";                              // El dato del estado del termostato lo envía al campo 3 del canal de Thingspeak
-    postStr += String( tiempobomba );
-    postStr += "&field4=";                              // El dato del funcionamiento lo envía al campo 4 del canal de Thingspeak
-    postStr += String( millis() );
-    postStr += "\r\n\r\n";
-
-    if ( monitorserie == true )
-    {
-      Serial.println( "ENVIANDO DATOS A THINGSPEAK" );
-    }
-
-    client.print( "POST /update HTTP/1.1\n" );
-    client.print( "Host: api.thingspeak.com\n" );
-    client.print( "Connection: close\n" );
-    client.print( "X-THINGSPEAKAPIKEY: "+apiKey+"\n" );
-    client.print( "Content-Type: application/x-www-form-urlencoded\n" );
-    client.print( "Content-Length: " );
-    client.print( postStr.length() );
-    client.print( "\n\n" );
-    client.print( postStr );
-  } 
+    enviarDatosAThingspeak();
+  }
   delay( 1000 );
   client.stop();
-  
+}
+
+void enviarDatosAThingspeak(void)
+{
+  String postStr = apiKey;
+
+  postStr += "&field1=";                              // El dato de litros restantes lo envía al campo 1 del canal de Thingspeak
+  postStr += String( litros_restantes );
+  postStr += "&field2=";                              // El dato de temperatura objetivo lo envía al campo 2 del canal de Thingspeak
+  postStr += String( tiempoacumulado );
+  postStr += "&field3=";                              // El dato del estado del termostato lo envía al campo 3 del canal de Thingspeak
+  postStr += String( tiempobomba );
+  postStr += "&field4=";                              // El dato del funcionamiento lo envía al campo 4 del canal de Thingspeak
+  postStr += String( millis() );
+  postStr += "\r\n\r\n";
+
+  if ( monitorserie == true )
+  {
+    Serial.println( "ENVIANDO DATOS A THINGSPEAK" );
   }
+
+  client.print( "POST /update HTTP/1.1\n" );
+  client.print( "Host: api.thingspeak.com\n" );
+  client.print( "Connection: close\n" );
+  client.print( "X-THINGSPEAKAPIKEY: "+apiKey+"\n" );
+  client.print( "Content-Type: application/x-www-form-urlencoded\n" );
+  client.print( "Content-Length: " );
+  client.print( postStr.length() );
+  client.print( "\n\n" );
+  client.print( postStr );
+}
