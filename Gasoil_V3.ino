@@ -2,7 +2,7 @@
  *@file Gasoil_V3.ino
  *@brief Control del consumo de Gasoil
  *
- *@authorDr.Zhao Zhang
+ *@author Palermos y Trasterlabs
  *@note: Se ha utilizado la siguiente configuración hardware para su uso: Wemos D1 + Sensor de corriente efecto Hall + Servo indicador de litros + Relé SSR avisador de reserva + Thingspeak + OTA
  */
 
