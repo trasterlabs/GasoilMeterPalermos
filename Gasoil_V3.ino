@@ -71,162 +71,129 @@ Servo myServo;
 //====================================================
 
 
-void setup() {
-  
-    if (monitorserie == true)
-     {
-    Serial.begin(9600);                             // Poner monitor serie a 9600 baudios
-    delay(10);    
-     }
-
+void setup()
+{
+  if ( monitorserie == true )
+  {
+    Serial.begin( 9600 );                             // Poner monitor serie a 9600 baudios
+    delay( 10 );    
+  }
 
   WiFi.mode(WIFI_STA);
   ArduinoOTA.setHostname(host);
-  ArduinoOTA.onError([](ota_error_t error) 
-      {
-          (void)error;
-          ESP.restart();
-      });
+  
+  ArduinoOTA.onError( []( ota_error_t error )
+  {
+    (void) error;
+    ESP.restart();
+  } );
 
   ArduinoOTA.begin();
-  
-  pinMode(SSR, OUTPUT);
-  digitalWrite(SSR, LOW); 
 
-    myServo.attach(ServoPIN);
-    myServo.write(angle);
-    delay (500);
-    
-    Thingspeak();
-    
-    
-    tiempo.every (60000, Thingspeak);
-    }
+  pinMode( SSR, OUTPUT );
+  digitalWrite( SSR, LOW ); 
 
+  myServo.attach( ServoPIN );
+  myServo.write( angle );
+  delay( 500 );
+
+  Thingspeak();
+
+  tiempo.every( 60000, Thingspeak );
+}
 
 
-//====================================================
-// LOOP
-//====================================================
 
-
-void loop() {
+void loop()
+{
 
   ArduinoOTA.handle();
   
-tiempo.update();
+  tiempo.update();
+  
+  corriente = 0;
+  
+  for ( i = 0; i < 100; i++ )
+  {
+    corriente = analogRead( HALL ) + corriente;
+  }
+  
+  
+  corriente = corriente / 100;
 
-corriente = 0;
+  if ( corriente < 1000 )
+  {
+    tiempoinicio = millis();
 
-    for (i=0; i<100; i++)
-       {
-          corriente = analogRead (HALL) + corriente;
-       }
-                                
-                    
-                       corriente = corriente/100;
-
-    
-    
-    if (corriente < 1000 )
+    while ( corriente < 1000 )
+    {
+      ESP.wdtFeed();
+  
+      corriente = 0;
+  
+      for ( i = 0; i < 100; i++ )
       {
-
-          tiempoinicio = millis();
-   
-      
-              while (corriente < 1000 )
-                  {
-
-                       ESP.wdtFeed();
-                
-                       corriente = 0;
-                       
-                
-                               for (i=0; i<100; i++)
-                                {
-                                  corriente = analogRead (HALL) + corriente;
-                                }
-                                
-                    
-                       corriente = corriente/100;
-            
-      
-                               if (monitorserie == true)
-                                  {
-                                      Serial.print ("A0 ACTIVADO = ");
-                                      Serial.println (corriente);
-                                  }
-                    }
-         
-
-              tiempofin = millis();
-              
-              tiempobomba = tiempofin - tiempoinicio;  
-            
-              tiempoacumulado = tiempoacumulado + tiempobomba;
+        corriente = analogRead( HALL ) + corriente;
+      }
+    
+    
+      corriente = corriente / 100;
+    
+    
+      if ( monitorserie == true )
+      {
+        Serial.print( "A0 ACTIVADO = " );
+        Serial.println( corriente );
+      }
+    }
+    
+    
+    tiempofin = millis();
+    tiempobomba = tiempofin - tiempoinicio;  
+    tiempoacumulado = tiempoacumulado + tiempobomba;
+  }
   
-       }
-
-
-  litros_consumidos = (tiempoacumulado * l_seg) / 1000;
-
+  
+  litros_consumidos = ( tiempoacumulado * l_seg ) / 1000;
+  
   litros_restantes = litros_medidos - litros_consumidos;
-
   
+  
+  
+  angle = map( litros_restantes, 0, 4000, 170, -5 );
+  myServo.write( angle );
 
-      angle = map(litros_restantes,0,4000,170,-5);
-      myServo.write(angle);
-      
+  if ( litros_restantes < 1000 )
+  {
+    digitalWrite( SSR, ( millis() / 1000 ) % 2 );
+  }
+  else 
+  {
+    digitalWrite( SSR, LOW );
+  }
 
-
-
-
-
-
-          if (litros_restantes < 1000)
-                    {
-                        digitalWrite(SSR, (millis() / 1000) % 2);
-                    }
-            
-                        else 
-                          {
-                              digitalWrite (SSR, LOW);
-                          }
-
-
-
-
-
-
-    if (monitorserie == true)
-        {
-            Serial.print ("Tiempo inicio = ");
-            Serial.println (tiempoinicio);
-            Serial.print ("Tiempo fin = ");
-            Serial.println (tiempofin);
-            Serial.print ("Tiempo bomba = ");
-            Serial.println (tiempobomba);
-            Serial.print ("Tiempo acumulado = ");
-            Serial.println (tiempoacumulado);
-            Serial.print ("MILLIS = ");
-            Serial.println (millis());
-            Serial.print ("A0 = ");
-            Serial.println (corriente);
-            Serial.print ("Litros consumidos = ");
-            Serial.println (litros_consumidos);
-            Serial.print ("Litros restantes = ");
-            Serial.println (litros_restantes);
-            Serial.print ("Angulo = ");
-            Serial.print (angle);
-            Serial.println(" º");
-        }
-
-
-      
-                
-
-
-
+  if ( monitorserie == true )
+  {
+    Serial.print( "Tiempo inicio = " );
+    Serial.println( tiempoinicio );
+    Serial.print( "Tiempo fin = " );
+    Serial.println( tiempofin );
+    Serial.print( "Tiempo bomba = " );
+    Serial.println(tiempobomba );
+    Serial.print( "Tiempo acumulado = " );
+    Serial.println( tiempoacumulado );
+    Serial.print( "MILLIS = " );
+    Serial.println( millis() );
+    Serial.print( "A0 = " );
+    Serial.println( corriente );
+    Serial.print( "Litros consumidos = " );
+    Serial.println( litros_consumidos );
+    Serial.print( "Litros restantes = " );
+    Serial.println( litros_restantes );
+    Serial.print( "Angulo = " );
+    Serial.print( angle );
+    Serial.println(" º");
+  }
 }
 
 
@@ -237,28 +204,27 @@ corriente = 0;
 //====================================================
 
 void conectawifi()
-  {
+{
+
+  WiFi.begin( ssid, password );
   
-    WiFi.begin(ssid, password);
+  if ( monitorserie == true )
+  {
+    Serial.print( "Conectando a WiFi " );
 
-        if (monitorserie == true)
-            {
-                Serial.print("Conectando a WiFi ");
- 
-                while (WiFi.status() != WL_CONNECTED) 
-                    {
-                        Serial.print(".");
-                        delay (100);
-                    }
+    while ( WiFi.status() != WL_CONNECTED ) 
+    {
+      Serial.print( "." );
+      delay( 100 );
+    }
 
-              Serial.println(" ");
-              Serial.print("Conexion satisfactoria a ");
-              Serial.println(ssid);
-              Serial.println(" ");
+    Serial.println( " " );
+    Serial.print( "Conexion satisfactoria a " );
+    Serial.println( ssid );
+    Serial.println( " " );
 
-
-            }
-   }
+  }
+}
 
 
 
@@ -267,49 +233,47 @@ void conectawifi()
 //====================================================
 
 void Thingspeak()
-    {
-
+{
+  if ( WiFi.status() != WL_CONNECTED ) 
+  {
+    conectawifi();
+  }
   
-          if  (WiFi.status() != WL_CONNECTED) 
-              {
-                conectawifi();
-              }
-
-
-  if (client.connect(server,80)) 
-        {
-            String postStr = apiKey;
-
-            postStr +="&field1=";                              // El dato de litros restantes lo envía al campo 1 del canal de Thingspeak
-            postStr += String(litros_restantes);
-            postStr +="&field2=";                              // El dato de temperatura objetivo lo envía al campo 2 del canal de Thingspeak
-            postStr += String(tiempoacumulado);
-            postStr +="&field3=";                              // El dato del estado del termostato lo envía al campo 3 del canal de Thingspeak
-            postStr += String(tiempobomba);
-            postStr +="&field4=";                              // El dato del funcionamiento lo envía al campo 4 del canal de Thingspeak
-            postStr += String(millis());
-            postStr += "\r\n\r\n";
-
-
-
-                   if (monitorserie == true)
-                      {
-                    Serial.println("ENVIANDO DATOS A THINGSPEAK");
-                      } 
-
- 
-            client.print("POST /update HTTP/1.1\n");
-            client.print("Host: api.thingspeak.com\n");
-            client.print("Connection: close\n");
-            client.print("X-THINGSPEAKAPIKEY: "+apiKey+"\n");
-            client.print("Content-Type: application/x-www-form-urlencoded\n");
-            client.print("Content-Length: ");
-            client.print(postStr.length());
-            client.print("\n\n");
-            client.print(postStr);
-           
-         } 
-            delay(1000);
-            client.stop();
-
-    }
+  
+  if ( client.connect( server, 80 ) ) 
+  {
+    String postStr = apiKey;
+    
+    postStr += "&field1=";                              // El dato de litros restantes lo envía al campo 1 del canal de Thingspeak
+    postStr += String( litros_restantes );
+    postStr += "&field2=";                              // El dato de temperatura objetivo lo envía al campo 2 del canal de Thingspeak
+    postStr += String( tiempoacumulado );
+    postStr += "&field3=";                              // El dato del estado del termostato lo envía al campo 3 del canal de Thingspeak
+    postStr += String( tiempobomba );
+    postStr += "&field4=";                              // El dato del funcionamiento lo envía al campo 4 del canal de Thingspeak
+    postStr += String( millis() );
+    postStr += "\r\n\r\n";
+    
+    
+    
+    if (monitorserie == true)
+    {
+      Serial.println("ENVIANDO DATOS A THINGSPEAK");
+    } 
+    
+    
+    client.print( "POST /update HTTP/1.1\n" );
+    client.print( "Host: api.thingspeak.com\n" );
+    client.print( "Connection: close\n" );
+    client.print( "X-THINGSPEAKAPIKEY: "+apiKey+"\n" );
+    client.print( "Content-Type: application/x-www-form-urlencoded\n" );
+    client.print( "Content-Length: " );
+    client.print( postStr.length() );
+    client.print( "\n\n" );
+    client.print( postStr );
+    
+  } 
+  delay(1000);
+  client.stop();
+  
+  }
