@@ -48,7 +48,6 @@ const char* host = "OTA-LEDS";
 int litros_restantes = litros_medidos;
 int litros_consumidos;
 int angle = 170;
-int i = 0;
 float corriente = 0.0;
 unsigned long tiempoinicio = 0;
 unsigned long tiempofin = 0;
@@ -98,7 +97,7 @@ void loop()
   tiempo.update();
   corriente = 0;
   
-  for ( i = 0; i < 100; i++ )
+  for ( int i = 0; i < 100; i++ )
   {
     corriente = analogRead( HALL ) + corriente;
   }
@@ -113,7 +112,7 @@ void loop()
       ESP.wdtFeed();
       corriente = 0;
   
-      for ( i = 0; i < 100; i++ )
+      for ( int i = 0; i < 100; i++ )
       {
         corriente = analogRead( HALL ) + corriente;
       }
