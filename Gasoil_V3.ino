@@ -79,8 +79,8 @@ void setup()
     delay( 10 );    
   }
 
-  WiFi.mode(WIFI_STA);
-  ArduinoOTA.setHostname(host);
+  WiFi.mode( WIFI_STA );
+  ArduinoOTA.setHostname( host );
   
   ArduinoOTA.onError( []( ota_error_t error )
   {
